@@ -54,7 +54,7 @@ async function apiRequest(path = "", options = {}) {
     } catch (error) {
         throw new Error(
             `Cannot connect to the backend at ${API_BASE_URL}. ` +
-            "Check that FastAPI is running and CORS is configured."
+            "Cannot connect to the backend. Check that FastAPI is running"
         );
     }
 
