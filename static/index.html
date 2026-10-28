@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Management</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+    <main class="container">
+        <h1>Course Management</h1>
+        <p class="subtitle">Create, view, update and delete courses.</p>
+
+        <section class="panel">
+            <h2 id="form-title">Add a course</h2>
+
+            <form id="course-form">
+                <label for="title">Course title</label>
+                <input id="title" name="title" maxlength="150" required>
+
+                <label for="instructor">Instructor</label>
+                <input id="instructor" name="instructor" maxlength="100" required>
+
+                <label for="duration">Duration</label>
+                <input id="duration" name="duration" type="number"
+                       min="1" step="1" required>
+
+                <div class="actions">
+                    <button type="submit" id="submit-button">Add course</button>
+                    <button type="button" id="cancel-button" class="secondary" hidden>
+                        Cancel edit
+                    </button>
+                </div>
+                <p id="message" role="status" aria-live="polite"></p>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2>All courses</h2>
+            <button type="button" id="refresh-button" class="secondary">
+                Refresh courses
+            </button>
+            <div id="course-list" class="course-list"></div>
+        </section>
+    </main>
+</body>
+</html>

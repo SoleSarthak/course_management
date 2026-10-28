@@ -1,0 +1,117 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f5f9;
+    color: #202938;
+}
+
+.container {
+    width: min(900px, 92%);
+    margin: 40px auto;
+}
+
+h1 {
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: #667085;
+    margin-bottom: 28px;
+}
+
+.panel {
+    background: white;
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    box-shadow: 0 3px 14px #1720330d;
+}
+
+form {
+    display: grid;
+    gap: 10px;
+}
+
+input {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #cbd2dc;
+    border-radius: 7px;
+    font: inherit;
+    margin-bottom: 8px;
+}
+
+button {
+    border: 0;
+    border-radius: 7px;
+    padding: 11px 16px;
+    cursor: pointer;
+    background: #2457d6;
+    color: white;
+    font: inherit;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.secondary {
+    background: #e8edf5;
+    color: #202938;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.course-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.course-card {
+    border: 1px solid #e0e5ed;
+    border-radius: 9px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.course-card h3 {
+    margin: 0 0 7px;
+}
+
+.course-card p {
+    margin: 0;
+    color: #667085;
+}
+
+.course-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#message {
+    margin-bottom: 0;
+}
+
+@media (max-width: 550px) {
+    .container {
+        margin-top: 20px;
+    }
+
+    .panel {
+        padding: 16px;
+    }
+}

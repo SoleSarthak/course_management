@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 from database import create_table, get_connection
 
-
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -18,6 +20,19 @@ app = FastAPI(
     title="course management api",
     lifespan=lifespan,
 )
+
+BASE_DIR = Path(__file__).resolve().parent
+
+app.mount(
+    "/static",
+    StaticFiles(directory=BASE_DIR / "static"),
+    name="static",
+)
+
+
+@app.get("/")
+def home():
+    return FileResponse(BASE_DIR / "static" / "index.html")
 
 
 
