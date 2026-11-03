@@ -525,27 +525,27 @@ def get_modules(course_id: int):
 
 # progress
 
-@app.post("/progress/lessons/{lesson_id}/complete")
-def complete_lesson(lesson_id: int,):
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO progress (user_id, lesson_id, completed, completed_at)
-                VALUES (%s, %s, TRUE, CURRENT_TIMESTAMP)
-                ON CONFLICT (user_id, lesson_id)
-                DO UPDATE SET
-                    completed = TRUE,
-                    completed_at = CURRENT_TIMESTAMP
-                RETURNING id;
-            """, ( lesson_id))
+# @app.post("/progress/lessons/{lesson_id}/complete")
+# def complete_lesson(lesson_id: int,):
+#     with get_connection() as connection:
+#         with connection.cursor() as cursor:
+#             cursor.execute("""
+#                 INSERT INTO progress (user_id, lesson_id, completed, completed_at)
+#                 VALUES (%s, %s, TRUE, CURRENT_TIMESTAMP)
+#                 ON CONFLICT (user_id, lesson_id)
+#                 DO UPDATE SET
+#                     completed = TRUE,
+#                     completed_at = CURRENT_TIMESTAMP
+#                 RETURNING id;
+#             """, ( lesson_id))
 
-            progress = cursor.fetchone()
+#             progress = cursor.fetchone()
 
-            return {
-                "message": "Lesson completed",
-                "progress_id": progress[0],
-                "lesson_id": lesson_id
-            }
+#             return {
+#                 "message": "Lesson completed",
+#                 "progress_id": progress[0],
+#                 "lesson_id": lesson_id
+#             }
 
 
 @app.get("/progress/courses/{course_id}")
