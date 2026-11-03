@@ -1,9 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status , APIRouter
 from pydantic import BaseModel, Field , EmailStr
 
-from backend.database import create_table, get_connection
+from database import create_table, get_connection
 
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +25,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+course_router = APIRouter(prefix="/courses", tags=["Courses"])
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -63,8 +64,7 @@ def create_course(course: Course):
             return dict(zip(
                 ["id", "title", "instructor", "duration"],
                 row,
-            )
-            )
+            ))
 
 
 @app.get("/courses")
@@ -84,8 +84,7 @@ def get_courses():
                     ["id", "title", "instructor", "duration"],
                     row,
                 ))
-                for row in rows
-            ]        
+                for row in rows]        
 
 
 @app.get("/courses/{course_id}")
@@ -131,8 +130,7 @@ def update_course(course_id: int, course: Course):
                     course.instructor,
                     course.duration,
                     course_id,
-                ),
-            )
+                ),)
 
             row = cursor.fetchone()
 
@@ -159,8 +157,7 @@ def delete_course(course_id: int):
                 WHERE id = %s
                 RETURNING id;
                 """,
-                (course_id,),
-            )
+                (course_id,),)
 
             row = cursor.fetchone()
 
@@ -201,8 +198,7 @@ def register(user: RegisterRequest):
     try:
         cursor.execute(
             "SELECT id FROM users WHERE email = %s",
-            (user.email,)
-        )
+            (user.email,))
 
         if cursor.fetchone():
             raise HTTPException(
@@ -217,8 +213,7 @@ def register(user: RegisterRequest):
             VALUES (%s, %s, %s)
             RETURNING id, name, email, role
             """,
-            (user.name, user.email, hashed_password)
-        )
+            (user.name, user.email, hashed_password))
 
         new_user = cursor.fetchone()
         conn.commit()
@@ -236,8 +231,7 @@ def register(user: RegisterRequest):
         conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail="Something went wrong"
-        )
+            detail="Something went wrong")
 
     finally:
         cursor.close()
@@ -256,16 +250,14 @@ def login(user: LoginRequest):
             FROM users
             WHERE email = %s
             """,
-            (user.email,)
-        )
+            (user.email,))
 
         existing_user = cursor.fetchone()
 
         if not existing_user:
             raise HTTPException(
                 status_code=401,
-                detail="Invalid email or password"
-            )
+                detail="Invalid email or password")
 
         if not pwd_context.verify(
             user.password,
@@ -273,8 +265,7 @@ def login(user: LoginRequest):
         ):
             raise HTTPException(
                 status_code=401,
-                detail="Invalid email or password"
-            )
+                detail="Invalid email or password")
 
         return {
             "message": "Login successful",
@@ -303,8 +294,7 @@ def get_current_user():
             FROM users
             WHERE id = %s
             """,
-            (1,)
-        )
+            (1,))
 
         user = cursor.fetchone()
 
@@ -325,193 +315,290 @@ def get_current_user():
 
 #courses
 
-app.get("/")
-def get_courses():
-    return {
-        "message":"list of all courses"
-    }
+@course_router.get("/mine")
+def get_my_courses(user_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT c.id, c.title, c.instructor, c.duration
+                FROM courses c
+                JOIN enrollments e ON e.course_id = c.id
+                WHERE e.user_id = %s
+                ORDER BY c.id;
+            """, (user_id,))
 
-app.get("/mine")
-def get_my_courses():
-    return {
-        "message":"my courses"
-    }
+            courses = cursor.fetchall()
 
-app.get("/{course_id}")
-def get_course(course_id:int):
-    return {
-        "message":"course details",
-        "course_id": course_id
-    }
-
-app.get("/{course_id}/outline")
-def get_course_outline(course_id:int):
-    return {
-        "message":"course outline",
-        "course_id":course_id
-    }
-
-app.post("/")
-def create_course():
-    return {
-        "message":"course created successfully"
-    }
+            return [
+                {
+                    "id": course[0],
+                    "title": course[1],
+                    "instructor": course[2],
+                    "duration": course[3],
+                }
+                for course in courses
+            ]
 
 
-@app.put("/{course_id}")
-def update_course(course_id: int):
-    return {
-        "message": "Course updated successfully",
-        "course_id": course_id
-    }
 
-@app.delete("/{course_id}")
-def delete_course(course_id: int):
-    return {
-        "message": "Course deleted successfully",
-        "course_id": course_id
-    }
+app.include_router(course_router)
 
 
 #certificates
 
-@app.get("certificate")
-def get_my_certificates():
-    return{
-        "message":"certificates received"
-    }
+@app.get("/certificate")
+def get_my_certificates(user_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT cert.id, c.title, cert.issued_at
+                FROM certificates cert
+                JOIN courses c ON c.id = cert.course_id
+                WHERE cert.user_id = %s
+                ORDER BY cert.issued_at DESC;
+            """, (user_id,))
+
+            certificates = cursor.fetchall()
+
+            return [
+                {
+                    "certificate_id": certificate[0],
+                    "course_title": certificate[1],
+                    "issued_at": certificate[2],
+                }
+                for certificate in certificates
+            ]
 
 
-#enrollments
+# #enrollments
 
-@app.post()
-def enroll_in_course():
-    return {
-        "message":"enrolled"
-    }
+@app.post("/enrollments")
+def enroll_in_course(user_id: int, course_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO enrollments (user_id, course_id)
+                VALUES (%s, %s)
+                RETURNING id;
+            """, (user_id, course_id))
 
-@app.get("")
-def get_my_enrollments():
-    return {
-        "message":"enrolled courses"
-    }
+            enrollment = cursor.fetchone()
+
+            return {
+                "message": "Enrolled successfully",
+                "enrollment_id": enrollment[0]
+            }
+
+
+@app.get("/enrollments")
+def get_my_enrollments(user_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT c.id, c.title, c.instructor, c.duration
+                FROM courses c
+                JOIN enrollments e ON e.course_id = c.id
+                WHERE e.user_id = %s;
+            """, (user_id,))
+
+            enrollments = cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "title": row[1],
+                    "instructor": row[2],
+                    "duration": row[3]
+                }
+                for row in enrollments
+            ]
 
 #lessons
 @app.post("/modules/{module_id}/lessons")
-def create_lesson():
-    return {"message": "Lesson created successfully"}
+def create_lesson(module_id: int, title: str, lesson_order: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO lessons (module_id, title, lesson_order)
+                VALUES (%s, %s, %s)
+                RETURNING id, title, lesson_order;
+            """, (module_id, title, lesson_order))
 
+            lesson = cursor.fetchone()
+
+            return {
+                "message": "Lesson created successfully",
+                "lesson_id": lesson[0],
+                "title": lesson[1],
+                "lesson_order": lesson[2]
+            }
 
 @app.get("/modules/{module_id}/lessons")
 def get_lessons(module_id: int):
-    return {"message": "List of lessons"}
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, title
+                FROM lessons
+                WHERE module_id = %s
+                ORDER BY id;
+            """, (module_id,))
+
+            lessons = cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "title": row[1]
+                }
+                for row in lessons]
 
 
 @app.get("/lessons/{lesson_id}")
 def get_lesson(lesson_id: int):
-    return {
-        "message": "Lesson details",
-        "lesson_id": lesson_id
-    }
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, module_id, title
+                FROM lessons
+                WHERE id = %s;
+            """, (lesson_id,))
+
+            lesson = cursor.fetchone()
+
+            if lesson is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Lesson not found")
+
+            return {
+                "id": lesson[0],
+                "module_id": lesson[1],
+                "title": lesson[2]
+            }
 
 
 #modules
 
 @app.post("/courses/{course_id}/modules")
-def create_module(course_id:int):
-    return {
-        "message": "Module created successfully",
-        "course_id": course_id
-    }
+def create_module(course_id: int, title: str, module_order: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO modules (course_id, title, module_order)
+                VALUES (%s, %s, %s)
+                RETURNING id, title, module_order;
+            """, (course_id, title, module_order))
+
+            module = cursor.fetchone()
+
+            return {
+                "message": "Module created successfully",
+                "module_id": module[0],
+                "course_id": course_id,
+                "title": module[1],
+                "module_order": module[2]
+            }
 
 
 @app.get("/courses/{course_id}/modules")
 def get_modules(course_id: int):
-    return {
-        "message": "List of modules",
-        "course_id": course_id
-    }
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, title
+                FROM modules
+                WHERE course_id = %s
+                ORDER BY id;
+            """, (course_id,))
+
+            modules = cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "title": row[1]
+                }
+                for row in modules
+            ]
 
 
-#progress
+# progress
 
 @app.post("/progress/lessons/{lesson_id}/complete")
-def complete_lesson(lesson_id: int):
-    return {
-        "message": "Lesson completed",
-        "lesson_id": lesson_id
-    }
+def complete_lesson(lesson_id: int,):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO progress (user_id, lesson_id, completed, completed_at)
+                VALUES (%s, %s, TRUE, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, lesson_id)
+                DO UPDATE SET
+                    completed = TRUE,
+                    completed_at = CURRENT_TIMESTAMP
+                RETURNING id;
+            """, ( lesson_id))
+
+            progress = cursor.fetchone()
+
+            return {
+                "message": "Lesson completed",
+                "progress_id": progress[0],
+                "lesson_id": lesson_id
+            }
 
 
 @app.get("/progress/courses/{course_id}")
-def get_progress_for_course(course_id: int):
-    return {
-        "message": "Course progress",
-        "course_id": course_id
-    }
+def get_progress_for_course(course_id: int, user_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    COUNT(l.id),
+                    COUNT(p.lesson_id)
+                FROM modules m
+                JOIN lessons l ON l.module_id = m.id
+                LEFT JOIN progress p
+                    ON p.lesson_id = l.id
+                    AND p.user_id = %s
+                    AND p.completed = TRUE
+                WHERE m.course_id = %s;
+            """, (user_id, course_id))
 
+            result = cursor.fetchone()
 
-#quizzes
+            total_lessons = result[0]
+            completed_lessons = result[1]
 
-@app.post("/quizzes/courses/{course_id}")
-def create_quiz(course_id: int):
-    return {
-        "message": "Quiz created successfully",
-        "course_id": course_id
-    }
+            return {
+                "course_id": course_id,
+                "total_lessons": total_lessons,
+                "completed_lessons": completed_lessons,
+                "progress": (
+                    round(completed_lessons / total_lessons * 100, 2)
+                    if total_lessons else 0)
+            }
 
-
-@app.get("/quizzes/courses/{course_id}")
-def get_course_quizzes(course_id: int):
-    return {
-        "message": "List of course quizzes",
-        "course_id": course_id
-    }
-
-
-@app.post("/quizzes/{quiz_id}/questions")
-def create_question(quiz_id: int):
-    return {
-        "message": "Question created successfully",
-        "quiz_id": quiz_id
-    }
-
-
-@app.get("/quizzes/{quiz_id}")
-def get_quiz(quiz_id: int):
-    return {
-        "message": "Quiz details",
-        "quiz_id": quiz_id
-    }
-
-
-@app.get("/quizzes/{quiz_id}/questions")
-def get_questions(quiz_id: int):
-    return {
-        "message": "List of quiz questions",
-        "quiz_id": quiz_id
-    }
-
-
-@app.get("/quizzes/{quiz_id}/attempts")
-def get_my_attempts(quiz_id: int):
-    return {
-        "message": "Quiz attempts",
-        "quiz_id": quiz_id
-    }
-
-
-@app.post("/quizzes/{quiz_id}/submit")
-def submit_quiz(quiz_id: int):
-    return {
-        "message": "Quiz submitted",
-        "quiz_id": quiz_id
-    }
 
 #certificates
 
 @app.get("/certificates")
-def get_my_certificates():
-    return {
-        "message": "My certificates"
-    }
+def get_my_certificates(user_id: int):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, course_id, issued_at
+                FROM certificates
+                WHERE user_id = %s;
+            """, (user_id,))
+
+            certificates = cursor.fetchall()
+
+            return [
+                {
+                    "id": row[0],
+                    "course_id": row[1],
+                    "issued_at": row[2]
+                }
+                for row in certificates
+            ]
